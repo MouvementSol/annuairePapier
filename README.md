@@ -8,7 +8,8 @@ Il est constitué de :
 * images à importer dans le document
 * données au format CSV
 ## Résultat
-![Résultat Recto](resultatRecto.png)
+![Résultat Recto](doc/resultatRecto.png)
+
 Une fois plié en huit, la partie 1 se retrouve devant et la partie 2 derrière. En dépliant une fois, la partie 3  apparait en premier et contient les deux premières colonnes de texte. La suite est au verso et la partie 4 contient les quatre dernières colonnes.
 
 ## Rôle des fichiers
