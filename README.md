@@ -1,5 +1,5 @@
 # Génération d'annuaire papier
-Ce projet a pour but la génération d'annuaires papier au format PDF à partir de données au format CSV provenant par exemple d'une exportation par Dolibarr.
+Ce projet a pour but la génération d'annuaires papier A4 recto-verso au format PDF à partir de données au format CSV provenant par exemple d'une exportation par Dolibarr.
 Il est constitué de :
 
 * fichiers annuaire vierges au format Scribus (.sla)
