@@ -11,16 +11,17 @@ Il est constitué de :
 ![Résultat Recto](doc/resultatRecto.png)
 Eléments paramétrables : 
 
-A. les trois couleurs utilisées dans le document
-B. le texte du bandeau
-C. le logo principal : fichier `logo.png`
-D. le QRcode : fichier `qrcode.png`
-E. adresse internet de l'annuaire
-F. le petit logo : fichier `petitLogo.png`
-G. adresse de l'association
-H. les adresses des professionnels : fichier demandé à l'exécution du script
-I. les adresses des bureaux de changes sont les professionnels dont le champ Bureau de change est à 1
+A. les trois couleurs utilisées dans le document\
+B. le texte du bandeau\
+C. le logo principal : fichier `logo.png`\
+D. le QRcode : fichier `qrcode.png`\
+E. adresse internet de l'annuaire\
+F. le petit logo : fichier `petitLogo.png`\
+G. adresse de l'association\
+H. les adresses des professionnels : fichier demandé à l'exécution du script\
+I. les adresses des bureaux de changes sont les professionnels dont le champ Bureau de change est à 1\
 J. Images pour remplir les espaces sans adresse : fichiers `image1.png`, `image2.png`, `image3.png`, `image4.png`
+
 
 Une fois plié en huit, la partie 1 se retrouve devant et la partie 2 derrière. En dépliant une fois, la partie 3  apparait en premier et contient les deux premières colonnes de texte. La suite est au verso et la partie 4 contient les quatre dernières colonnes.
 
@@ -49,7 +50,29 @@ Son contenu est le suivant :
 ...
 ```
 ### Sélection des professionnels
-Lorsque le nombre de professionnels dépasse 150, une sélection doit être faite et plusieurs annuaires générés.
+Lorsque le nombre de professionnels dépasse 150, une sélection doit être faite et plusieurs annuaires générés en fonction de zones géographiques.
+Cette sélection peut se faire par les codes postaux ou par les coordonnées : latitude, longitude.
+Le paramètre `filtreGeo` du fichier `parametres.csv` précise cette sélection
+
+#### Codes postaux
+Si les valeurs de la ligne commençant par "filtreGeo" sont des codes postaux (nombres sans décimales) séparés par des virgules (,) seuls les professionnels avec ces codes seront importés. Si le premier de ces codes est le mot "sauf", seuls les professionnels n'ayant pas ces codes seront importés.
+
+#### Coordonnées
+Si les valeurs sont des nombres décimaux avec le point comme séparateur décimal, ils sont interprétés comme des paires latitude, longitude et seuls les professionnels à l'intérieur du polygone délimités par les points seront importés.
+Par exemple, la ligne suivante dessine un polygone autour de Strasbourg :
+```
+"filtreGeo", 48.647043,7.846305,  48.647043,7.79, 48.606757,7.759547, 48.604764,7.688182, 48.560268,7.689072, 48.539095,7.753256, 48.493268,7.747884, 48.493268,7.80
+```
+![Polygone Strasbourg](imgExemples/polygoneStrasbourg.jpg)
+
+Et cette ligne délimite tout le département sauf Strasbourg
+```
+"filtreGeo", 48.647043,7.846305,  48.647043,7.79, 48.606757,7.759547, 48.604764,7.688182, 48.560268,7.689072, 48.539095,7.753256, 48.493268,7.747884, 48.493268,7.80, 48.64,7.846305, 49.1,8.42, 48.101784,8.42, 48.101784,6.83, 49.1,6.83, 49.1,8.41
+```
+![Polygone Strasbourg](imgExemples/polygoneHorsStrasbourg.jpg)
+
+### Tests
+Le script `lireDonnees.py` permet de tester un fichier de données et son paramétrage en ligne de commande, il compte le nombre de professionnels filtrés en utilisant le script `importerPros.py`
 
 ### Paramètrage
 Le fichier CSV `parametres.csv` permet de paramétrer :

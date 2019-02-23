@@ -89,9 +89,9 @@ def getColorsFromCsv(filename, idxPro):
     csvreader=csv.reader(file(filename))
     csvcolors=[]
     for row in csvreader:
-        name=row[0].strip()
-        if idxPro==1:
-          if name[0:7]=='couleur': 
+        if len(row)>1 and idxPro==1:
+          name=row[0].strip()
+          if len(row)>4 and name[0:7]=='couleur': 
             c=int(row[1] )* 2.55
             c=int(c)
             m=int(row[2] )* 2.55
@@ -121,7 +121,7 @@ def getColorsFromCsv(filename, idxPro):
 
 def readGlobalParameter(row):
     global polygone, codesPostaux, bSaufCodes
-    if row[0]=="filtreGeo":
+    if len(row)>0 and row[0]=="filtreGeo":
             if len(row)>1 and '.' in row[1]:
                 for iCoor in range(1,len(row), 2):
                     polygone.append((float(row[iCoor].strip()), float(row[iCoor+1].strip())))
