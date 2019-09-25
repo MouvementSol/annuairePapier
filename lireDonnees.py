@@ -16,7 +16,7 @@ strDir = os.path.dirname(filename)
 if not strDir:
     strDir='.'
 
-csvreader=csv.reader(file(strDir+pro.PARAMETRES))
+csvreader=csv.reader(file(strDir+pro.filParam))
 for row in csvreader:
     pro.readGlobalParameter(row)
     if len(row)>1 and row[0]=="txtBandeau":

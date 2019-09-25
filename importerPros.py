@@ -61,13 +61,14 @@ LOGO="/logo.png"
 SMALL_LOGO="/petitLogo.png"
 SOCIETE= "/export_societe.csv"
 CATEGORIE= "/categorie.csv"
-PARAMETRES="/parametres.csv"
+filParam="/parametres.csv"
 ENCODING= "iso8859_15"  #encodage du fichier provenant de Dolibarr
 DESC_MAX_LEN=80
-NB_TXT=4
+NB_TXT=8
 polygone=[] #Filtrage des pros par polygone géographique
 codesPostaux=[] #Filtrage des pros par une liste de codes postaux
 bSaufCodes=False
+bLivret=False
 
 def toUnicode(str):
 	return unicode(str.replace('"','\\"').replace("\t",""), ENCODING)
@@ -118,19 +119,23 @@ def getColorsFromCsv(filename, idxPro):
         readGlobalParameter(row)
 
     return csvcolors
-
+""" Lecture des paramètres généraux (hors couleurs et zones de texte) """
 def readGlobalParameter(row):
-    global polygone, codesPostaux, bSaufCodes
-    if len(row)>0 and row[0]=="filtreGeo":
-            if len(row)>1 and '.' in row[1]:
+    global polygone, codesPostaux, bSaufCodes, bLivret, NB_TXT
+    if len(row)>0:
+        # log(str(len(row))+ " parametres : "+str(row)+"\n")
+        if row[0]=="filtreGeo":
+            if len(row)>1 and '.' in row[1]: #Coordonnées géographiques : latitude, longitude
                 for iCoor in range(1,len(row), 2):
                     polygone.append((float(row[iCoor].strip()), float(row[iCoor+1].strip())))
-            elif len(row)>1:
+            elif len(row)>1: # Codes postaux
                 if row[1].strip()=="sauf":
                     codesPostaux=map(str.strip, row[2:])
                     bSaufCodes=True
                 else:
                     codesPostaux=map(str.strip, row[1:])
+        elif row[0]=="livret" and (len(row)<=1 or row[1]):
+            bLivret=True
 
 def getColorDict():
     """get the colors that already exist from the opened Document and return a dictionary"""
@@ -162,20 +167,21 @@ def importParametres(filename, idxPro):
 def importData(filename, idxPro):
     (nbLogo, nbImg, nbChange, nbPro, nbCol, nbCat) =(0,0,0,0,0,0)
 
+    global filParam
     strDir = os.path.dirname(filename)
-    if os.path.isfile(strDir+PARAMETRES):
-            nbCol=importParametres(strDir+PARAMETRES, idxPro)
+    if os.path.isfile(filParam):
+            nbCol=importParametres(filParam, idxPro)
 
     if idxPro==1: 
-        if os.path.isfile(strDir+LOGO): #Logo de la première page lorsque le document est entièrement plié en huit
+        if os.path.isfile(strDir+LOGO) and scribus.objectExists("imgLogo"): #Logo de la première page lorsque le document est entièrement plié en huit
             scribus.loadImage(strDir+LOGO, "imgLogo")
             nbLogo+=1
 
-        if os.path.isfile(strDir+LOGO): #Petit logo de la dernière page lorsque le document est entièrement plié en huit
+        if os.path.isfile(strDir+LOGO) and scribus.objectExists("imgSmallLogo"): #Petit logo de la dernière page lorsque le document est entièrement plié en huit
             scribus.loadImage(strDir+SMALL_LOGO, "imgSmallLogo")
             nbLogo+=1
 
-        if os.path.isfile(strDir+QRCODE): #QR code de la dernière page
+        if os.path.isfile(strDir+QRCODE) and scribus.objectExists("imgQrcode"): #QR code de la dernière page
             scribus.loadImage(strDir+QRCODE, "imgQrcode")
             nbImg=1
 
@@ -189,7 +195,7 @@ def importData(filename, idxPro):
     scribus.setText(datJ.strftime("%B %Y"), "txtDate")
     scribus.setStyle("styleDate","txtDate")
     if os.path.isfile(filename):  #Sociétés de l'annuaire et les noms des catégories
-        (nbChange, nbPro, nbCat)=importSocietes(strDir+SOCIETE, strDir+CATEGORIE, idxPro)
+        (nbChange, nbPro, nbCat)=importSocietes(filename, strDir+CATEGORIE, idxPro)
 
     return (nbLogo, nbImg, nbCol, nbChange, nbPro, nbCat)
 # Ouverture et lecture des fichiers de données et des catégories 
@@ -282,10 +288,9 @@ def importSocietes(filename, fileCat, iPro):
     (nbChg, nbPro)=(0,0)
     iCat=-1
     numPro=1
-    while scribus.getTextLength("txtPros%d" % numPro)>0 and numPro<6:
+    while scribus.getTextLength("txtPros%d" % numPro)>0 and numPro<=NB_TXT:
         numPro+=1
-
-    if iPro==1:
+    if iPro==1 and scribus.objectExists("txtBureauxChange"):
         scribus.deleteText("txtBureauxChange")
 
     scribus.progressTotal(len(arrLines))
@@ -304,7 +309,7 @@ def importSocietes(filename, fileCat, iPro):
             continue
         try:
           scribus.progressSet(nbPro)
-          if record[mapCol["chg"]]=="1":
+          if record[mapCol["chg"]]=="1" and scribus.objectExists("txtBureauxChange"):
             try:
                 nbCarBureau=scribus.getTextLength("txtBureauxChange")
                 appendText(u"● "+toUnicode(record[mapCol["nom"]])+"\n","styleChangeTitre","txtBureauxChange")
@@ -331,10 +336,21 @@ def importSocietes(filename, fileCat, iPro):
             appendText(u"\n","styleProBureau",strPro) #icone du bureau de change en police FontAwesome
          
           appendText(processDesc(toUnicode(record[mapCol["desc"]]))+"\n","styleProDesc",strPro)
-          appendText(toUnicode(record[mapCol["adr"]].replace("\\n"," - "))+"\n","styleProAdresse",strPro)
-          appendText(toUnicode(record[mapCol["post"]]+" "+record[mapCol["ville"]].upper())+"\n","styleProAdresse",strPro)
-          if record[mapCol["tel"]].strip(): 
-              appendText(processTelephone(record[mapCol["tel"]])+"\n","styleProAdresse",strPro)
+          if bLivret:
+              strAdr=toUnicode(record[mapCol["adr"]].replace("\\n"," - "))+" - " + toUnicode(record[mapCol["post"]])+" "
+              strAdr+=processDesc(toUnicode(record[mapCol["ville"]].upper()))
+              if record[mapCol["tel"]].strip():
+                  strAdr+=" ("+toUnicode(record[mapCol["tel"]].strip().replace(" ",chr(0xA0)))+")\n" #numéro de téléphone insécable
+              else:
+                  strAdr+="\n"
+
+              appendText(strAdr, "styleProAdresse", strPro)
+          else:
+            appendText(toUnicode(record[mapCol["adr"]].replace("\\n"," - "))+"\n","styleProAdresse",strPro)
+            appendText(toUnicode(record[mapCol["post"]])+" "+processDesc(toUnicode(record[mapCol["ville"]]).upper())+"\n","styleProAdresse",strPro)
+            if record[mapCol["tel"]].strip(): 
+                appendText(processTelephone(record[mapCol["tel"]])+"\n","styleProAdresse",strPro)
+
 
           if scribus.textOverflows(strPro, nolinks=1): #effacement du paragraphe de pro tronqué et du bureau de change en double
             scribus.selectText(nbCar, scribus.getTextLength(strPro)-nbCar, strPro)
@@ -343,7 +359,7 @@ def importSocietes(filename, fileCat, iPro):
                 scribus.selectText(nbCarBureau, scribus.getTextLength("txtBureauxChange")-nbCarBureau, "txtBureauxChange")
                 scribus.deleteText("txtBureauxChange")
 
-            log("Cadre rempli : le cadre de texte %s est plein à la ligne %d\n" % (strPro, nbPro))
+            #log("Cadre rempli : le cadre de texte %s est plein à la ligne %d\n" % (strPro, nbPro))
             break
         except Exception as exc:
                 scribus.messageBox( "Erreur","Une erreur est survenue sur ce professionnel: \n%s\n\n%s" %(record, str(exc)))
@@ -351,7 +367,7 @@ def importSocietes(filename, fileCat, iPro):
     
         
     return (nbChg, nbPro, nbCat)
-#traitement du champ description
+#traitement du champ description (et ville)
 def processDesc(strDesc):
     strRet=strDesc.replace('&#39;',"'").replace('&rsquo;',"'").replace('&nbsp;',' ').replace('&laquo;','"').replace('&raquo;','"').replace('&quot;','"').replace('&amp;',u'&').replace('&sup2;',u'²')
     strRet=strRet.replace('&eacute;',u"é").replace('&egrave;',u'è').replace('&ecirc;',u'ê').replace('&euml;',u'ë').replace('&agrave;',u'à').replace('&acirc;',u'â').replace('&icirc;',u'î').replace('&iuml;',u'ï').replace('&ocirc;',u'ô').replace('&ucirc;',u'û').replace('&ugrave;',u'ù').replace('&uuml;',u'ü').replace('&ccedil;',u'ç')
@@ -383,23 +399,25 @@ def log(strLog):
 
 def main(argv):
     """Main method"""
+    global filParam
     if not scribus.haveDoc(): #do we have a doc?
         scribus.messageBox("importerPros", "Le fichier d'annuaire vierge doit être ouvert pour importer les données")
         sys.exit()
     else:
-        filename=scribus.fileDialog("Fichier de données importer",  "Données (*.csv)", "", False) # Images (*.png *.xpm *.jpg)
+        filename=scribus.fileDialog("Fichier de données à importer",  "Données (*.csv)", "", False) # Images (*.png *.xpm *.jpg)
         if not filename : sys.exit()
-        while os.path.isdir(filename) :
-            filename=scribus.fileDialog("Fichier de données importer",  "Données (*.csv)", "", False) #proper filename?
+        filParam=scribus.fileDialog("Fichier de paramètres à utiliser",  "Données (*.csv)", filParam, False) 
+        if not filParam : sys.exit()
         else:
             try:
                 strNum=scribus.getText("txtNumPro") #récupération du dernier numéro de professionnel qui a été écrit dans une zone invisible
                 if scribus.messageBox("Importation des données", 
-                            "Importation du fichier de données : %s \net des fichiers suivants issus du même répertoire : \n.%s, \n.%s, \n.%s, \n.%s, \n.%s\nNuméro du professionnel à partir duquel le prochain cadre de texte vide sera rempli : %s" % (filename, QRCODE, LOGO, SMALL_LOGO, CATEGORIE, PARAMETRES, strNum), scribus.ICON_INFORMATION,scribus.BUTTON_CANCEL, scribus.BUTTON_OK)==scribus.BUTTON_CANCEL:
+                            "Importation du fichier de données : %s \net des fichiers suivants issus du même répertoire : \n.%s, \n.%s, \n.%s, \n.%s, \n.%s\nNuméro du professionnel à partir duquel le prochain cadre de texte vide sera rempli : %s" % (filename, QRCODE, LOGO, SMALL_LOGO, CATEGORIE, filParam, strNum), scribus.ICON_INFORMATION,scribus.BUTTON_CANCEL, scribus.BUTTON_OK)==scribus.BUTTON_CANCEL:
                     sys.exit()
                 else:
                   nbPro=1
-                  for iExec in range(NB_TXT):
+                  iExec=0
+                  while iExec < NB_TXT:
                     idxPro=nbPro #int(strNum)
                     (nbLogo, nbImg, nbCol, nbChange, nbPro, nbCat)=importData(filename, idxPro)
                     scribus.docChanged(True)
@@ -407,9 +425,10 @@ def main(argv):
                     #scribus.setStyle("styleProTitre", "txtNumPro")
                     if iExec<NB_TXT-1 and scribus.messageBox("importerPros", "%d logos importés \n%d images importées \n%d couleurs importées \n%d bureaux de change \n%d professionnels \n%d catégories\n\nContinuer ?" % (nbLogo, nbImg, nbCol, nbChange, nbPro, nbCat), scribus.ICON_INFORMATION,scribus.BUTTON_CANCEL, scribus.BUTTON_OK)==scribus.BUTTON_CANCEL:
                         sys.exit()
-
+                    else:
+                        iExec+=1
             except Exception as ex:
-                scribus.messageBox("importerPros", "Error : "+str(ex), icon=scribus.ICON_WARNING)
+                scribus.messageBox("importerPros", "Erreur : "+str(ex), icon=scribus.ICON_WARNING)
                 sys.exit()
             
 
