@@ -8,7 +8,7 @@ import csv
 
 if len(sys.argv)<2:
 	print "Test d'un fichier de données avec son paramétrage\n"
-	print "Utilisation :",sys.argv[0], "<CSV data file>\n"
+	print "Utilisation :",sys.argv[0], "<CSV data file> [<CSV parameter file>]\n"
 	exit(0)
 
 filename=sys.argv[1]
@@ -16,7 +16,11 @@ strDir = os.path.dirname(filename)
 if not strDir:
     strDir='.'
 
-csvreader=csv.reader(file(strDir+pro.filParam))
+paramFile=strDir+pro.filParam
+if len(sys.argv)>2:
+    paramFile=sys.argv[2]
+
+csvreader=csv.reader(file(paramFile))
 for row in csvreader:
     pro.readGlobalParameter(row)
     if len(row)>1 and row[0]=="txtBandeau":
@@ -34,6 +38,6 @@ elif pro.codesPostaux:
         print "codes postaux :", pro.codesPostaux
 
 nbCat=pro.readSocietes(filename, strDir+pro.CATEGORIE, mapCat, arrLines, mapCol)
-#for record in arrLines: print  record[mapCol["post"]]
+for record in arrLines: print  record[mapCol["nom"]]
 
 print "%d catégories, %d professionnels" % (nbCat, len(arrLines))

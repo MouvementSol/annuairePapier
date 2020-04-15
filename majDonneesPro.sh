@@ -34,3 +34,4 @@ read
 set -x
 sftp 275444@sftp.sd3.gpaas.net:/lamp0/web/vhosts/www.lestuck.eu/htdocs/ <<< $'put professionnels_du_stuck'
 set +x
+echo 'Mettre les carte à jour sur le site framacarte.org avec le fichier .../stuck/cyclos/professionnels_du_stuck.umap'
