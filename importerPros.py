@@ -54,6 +54,7 @@ import os
 import datetime
 import re
 import time
+import locale
 
 #PREFIX="*"
 QRCODE="/qrcode.png"
@@ -62,13 +63,15 @@ SMALL_LOGO="/petitLogo.png"
 SOCIETE= "/export_societe.csv"
 CATEGORIE= "/categorie.csv"
 filParam="/parametres.csv"
-ENCODING= "iso8859_15"  #encodage du fichier provenant de Dolibarr
+ENCODING= "utf8"  #encodage du fichier provenant de Odoo
 DESC_MAX_LEN=80
 NB_TXT=8
+SCRIBUS_BUG=True
 polygone=[] #Filtrage des pros par polygone géographique
 codesPostaux=[] #Filtrage des pros par une liste de codes postaux
 bSaufCodes=False
 bLivret=False
+locale.setlocale(locale.LC_TIME, "fr_FR")
 
 def toUnicode(str):
 	return unicode(str.replace('"','\\"').replace("\t",""), ENCODING)
@@ -149,6 +152,7 @@ def getColorDict():
         
 def importParametres(filename, idxPro):
     """check if colors exists and import"""
+    log("importParametres: "+filename+"\n")
     colordict=getColorDict()
     colorlist=getColorsFromCsv(filename, idxPro)
     if idxPro==1:
@@ -208,7 +212,7 @@ def readSocietes(filename, fileCat, mapCat, arrLines, mapCol):
             if bHeader:
                 bHeader=False
             elif len(line)>0:
-                mapCat[int(line[1])]=line[0]
+                # mapCat[int(line[1])]=line[0]
                 nbCat+=1
     
     bHeader=True
@@ -221,32 +225,33 @@ def readSocietes(filename, fileCat, mapCat, arrLines, mapCol):
                 bHeader=False
                 iCol=0
                 for colName in line:#table de correspondance des colonnes du fichier des pros
-                    if "nom" in colName.lower(): mapCol["nom"]=iCol
-                    elif "adresse" in colName.lower(): mapCol["adr"]=iCol
-                    elif "postal" in colName.lower(): mapCol["post"]=iCol
-                    elif "ville" in colName.lower(): mapCol["ville"]=iCol
+                    if "name" == colName.lower(): mapCol["nom"]=iCol
+                    elif "street" == colName.lower(): mapCol["adr"]=iCol
+                    elif "zip" in colName.lower(): mapCol["post"]=iCol
+                    elif "city" in colName.lower(): mapCol["ville"]=iCol
                     elif "email" in colName.lower(): mapCol["mail"]=iCol
-                    elif "phone" in colName.lower(): mapCol["tel"]=iCol
-                    elif "domaine" in colName.lower(): mapCol["cat"]=iCol
-                    elif "description" in colName.lower(): mapCol["desc"]=iCol
-                    elif "change" in colName.lower(): mapCol["chg"]=iCol
+                    elif "phone_pro" in colName.lower(): mapCol["tel"]=iCol
+                    elif "industry_id/name" == colName.lower(): mapCol["cat"]=iCol
+                    elif "detailed_activity" in colName.lower(): mapCol["desc"]=iCol
+                    elif "currency_exchange" in colName.lower(): mapCol["chg"]=iCol
                     elif "latitude" in colName.lower(): mapCol["lat"]=iCol
                     elif "longitude" in colName.lower(): mapCol["lng"]=iCol
                     iCol+=1
 
             elif len(line)>0 and estSelectionnee(line, mapCol, iLig):
-                arrLines.append(line) 
+                arrLines.append(line)
                 try: 
                     strCat=line[mapCol["cat"]]
-                    i=int(strCat)
-                    if not i in mapCat:     
-                        scribus.messageBox("Erreur","le domaine de la ligne %d n'est pas dans la liste des catégories (%s)"%(iLig, line))
+                    # i=int(strCat)
+                    # if not i in mapCat:     
+                    #     scribus.messageBox("Erreur","le domaine de la ligne %d n'est pas dans la liste des catégories (%s)"%(iLig, line))
                         
                 except:
+                    log(("domaine incorrect ligne %d : %s\n")%(iLig, line)) 
                     scribus.messageBox( "Erreur","le domaine de la ligne %d est incorrect (%s):\n%s" %(iLig, strCat, line))
                     sys.exit()
 
-    arrLines.sort(key=lambda line: (mapCat[int(line[mapCol["cat"]])], line[mapCol["nom"]])) #classement par nom de categorie puis nom
+    arrLines.sort(key=lambda line: (line[mapCol["cat"]], line[mapCol["nom"]])) #classement par nom de categorie puis nom
     return nbCat
 #Vrai si le lieu est à l'intérieur du polygone ou dans la liste des codes postaux
 def estSelectionnee(line, mapCol, iLig):
@@ -286,7 +291,6 @@ def importSocietes(filename, fileCat, iPro):
     mapCat={}#table de correspondance entre numéro de catégorie et nom de catégorie
     nbCat=readSocietes(filename, fileCat, mapCat, arrLines, mapCol)
     (nbChg, nbPro)=(0,0)
-    iCat=-1
     numPro=1
     while scribus.getTextLength("txtPros%d" % numPro)>0 and numPro<=NB_TXT:
         numPro+=1
@@ -297,9 +301,11 @@ def importSocietes(filename, fileCat, iPro):
     strPro="txtPros%d"%numPro
     scribus.statusMessage("Remplissage du cadre de texte %s..."%strPro)
     bFirstPro=True
+    strCat="#"
     for record in arrLines:#Pour chaque pro
-        if iCat != int(record[mapCol["cat"]]):#nouvelle categorie
-            iCat=int(record[mapCol["cat"]])
+        # log("nbPro=%d\n"%nbPro)
+        if strCat != record[mapCol["cat"]]:#nouvelle categorie
+            strCat=record[mapCol["cat"]]
             bNewCat=True
         else:
             bNewCat=False
@@ -309,7 +315,7 @@ def importSocietes(filename, fileCat, iPro):
             continue
         try:
           scribus.progressSet(nbPro)
-          if record[mapCol["chg"]]=="1" and scribus.objectExists("txtBureauxChange"):
+          if record[mapCol["chg"]]=="True" and scribus.objectExists("txtBureauxChange"):
             try:
                 nbCarBureau=scribus.getTextLength("txtBureauxChange")
                 appendText(u"● "+toUnicode(record[mapCol["nom"]])+"\n","styleChangeTitre","txtBureauxChange")
@@ -324,7 +330,6 @@ def importSocietes(filename, fileCat, iPro):
 
           nbCar=scribus.getTextLength(strPro)
           if bNewCat or bFirstPro:    
-            strCat=mapCat[int(record[mapCol["cat"]])]
             if bFirstPro and not bNewCat:
                 appendText(toUnicode(strCat+" (suite)")+"\n","styleProCatSuite",strPro)
             else:
@@ -332,7 +337,7 @@ def importSocietes(filename, fileCat, iPro):
 
           bFirstPro=False
           appendText(u"● "+toUnicode(record[mapCol["nom"]])+"\n","styleProTitre",strPro)
-          if record[mapCol["chg"]] :
+          if record[mapCol["chg"]]=="True" :
             appendText(u"\n","styleProBureau",strPro) #icone du bureau de change en police FontAwesome
          
           appendText(processDesc(toUnicode(record[mapCol["desc"]]))+"\n","styleProDesc",strPro)
@@ -340,7 +345,7 @@ def importSocietes(filename, fileCat, iPro):
               strAdr=toUnicode(record[mapCol["adr"]].replace("\\n"," - "))+" - " + toUnicode(record[mapCol["post"]])+" "
               strAdr+=processDesc(toUnicode(record[mapCol["ville"]].upper()))
               if record[mapCol["tel"]].strip():
-                  strAdr+=" ("+toUnicode(record[mapCol["tel"]].strip().replace(" ",chr(0xA0)))+")\n" #numéro de téléphone insécable
+                  strAdr+=" ("+toUnicode(record[mapCol["tel"]].strip().replace(" ","\xC2\xA0"))+")\n" #numéro de téléphone insécable
               else:
                   strAdr+="\n"
 
@@ -423,7 +428,7 @@ def main(argv):
                     scribus.docChanged(True)
                     #scribus.setText( str(nbPro), "txtNumPro")
                     #scribus.setStyle("styleProTitre", "txtNumPro")
-                    if iExec<NB_TXT-1 and scribus.messageBox("importerPros", "%d logos importés \n%d images importées \n%d couleurs importées \n%d bureaux de change \n%d professionnels \n%d catégories\n\nContinuer ?" % (nbLogo, nbImg, nbCol, nbChange, nbPro, nbCat), scribus.ICON_INFORMATION,scribus.BUTTON_CANCEL, scribus.BUTTON_OK)==scribus.BUTTON_CANCEL:
+                    if SCRIBUS_BUG and iExec<NB_TXT-1 and scribus.messageBox("importerPros", "%d logos importés \n%d images importées \n%d couleurs importées \n%d bureaux de change \n%d professionnels \n%d catégories\n\nContinuer ?" % (nbLogo, nbImg, nbCol, nbChange, nbPro, nbCat), scribus.ICON_INFORMATION,scribus.BUTTON_CANCEL, scribus.BUTTON_OK)==scribus.BUTTON_CANCEL:
                         sys.exit()
                     else:
                         iExec+=1
